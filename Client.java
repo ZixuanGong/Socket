@@ -10,6 +10,7 @@ public class Client {
 	MessageThread messageThread;
 	PrintWriter out;
 	BufferedReader in;
+	boolean connected = true;
 
 	public Client(String serverAddr, int port) {
 		try {
@@ -30,8 +31,6 @@ public class Client {
 					}
 				}
 			}
-			in.close();
-			out.close();
 			closeConn();
 		} catch (UnknownHostException e) {
 			e.printStackTrace();
@@ -43,7 +42,6 @@ public class Client {
 	private void closeConn()
 	{
 		try {
-			messageThread.stop();
 			if (in != null)
 				in.close();
 			if (out != null)
@@ -72,8 +70,14 @@ public class Client {
 		public void run() {
 			try {
 				String msg;
-				while ((msg = in.readLine()) != null)
+				while ((msg = in.readLine()) != null) {
+					if (msg.equals("TIME_OUT")) {
+						System.out.println("Time out, please login again");
+						out.println("OK");
+						continue;
+					}	
 					System.out.println(msg);
+				}
 			} catch (IOException e) {
 				e.printStackTrace();
 			}

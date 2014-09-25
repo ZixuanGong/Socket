@@ -9,7 +9,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.ArrayList;
+import java.util.Timer;
+import java.util.TimerTask;
 
 class User {
 	private String name;
@@ -17,6 +18,7 @@ class User {
 	private PrintWriter writer = null;
 	private Date loginTime = null;
 	private Date logoutTime = null; 
+	private Date activeTime = null;
 	
 	public String getName() {
 		return name;
@@ -46,13 +48,21 @@ class User {
 	public void setLogoutTime(Date logoutTime) {
 		this.logoutTime = logoutTime;
 	}
+	public Date getActiveTime() {
+		return activeTime;
+	}
+	public void setActiveTime(Date activeTime) {
+		this.activeTime = activeTime;
+	}
 }
 
 public class Server {
 	private enum Command {WHOELSE, WHOLASTHR, BROADCAST, MESSAGE, LOGOUT};
-
+	private static final int LAST_HOUR = 60 * 60; /* seconds */
+	private static final int TIME_OUT = 10; /* seconds */
+	private static final int BLOCK_TIME = 60; /* seconds */
 	private HashMap<String,User> users = new HashMap<>();
-	private static final long LAST_HOUR = (long) 60; /* minutes */
+	
 	public Server(int port){
 
 		/* Read from user_pass.txt */
@@ -92,8 +102,6 @@ public class Server {
 
 	}
 
-	
-
 	private class ServerThread extends Thread {
 		private Socket connSocket;
 		private BufferedReader in;
@@ -104,18 +112,40 @@ public class Server {
 		public ServerThread(Socket socket) {
 			this.connSocket = socket;
 		}
+		
+		private void logoutHandler() {
+			users.get(username).setLogoutTime(new Date());
+			users.get(username).setWriter(null);
+			System.out.println(username + " logged out");
+			
+		}
 
 		private void printError(String msg) 
 		{
 			out.println(">>Error: " + msg);
 		}
 
-		public void run() {
-			try {
-				in = new BufferedReader(new InputStreamReader(connSocket.getInputStream()));
-				out = new PrintWriter(connSocket.getOutputStream(), true);
+		private void checkActive(){
+			Timer timer = new Timer();
 
-				/* Log in */
+			timer.schedule(new TimerTask() {
+				
+				@Override
+				public void run() {
+					long diff = (new Date()).getTime() - users.get(username).getActiveTime().getTime();
+					if (diff > TIME_OUT * 1000) {
+						out.println("TIME_OUT");
+						logoutHandler();
+						ServerThread.this.stop();
+						new ServerThread(connSocket).start();
+						
+					}	
+				}
+			},  TIME_OUT * 1000);
+		}
+
+		private boolean loginHandler() {
+			try {
 				while (true) {
 					out.println(">>Username");
 					username = in.readLine();
@@ -124,7 +154,7 @@ public class Server {
 						printError("no such user");
 					}
 					else if (users.get(username).getWriter() != null) {
-						printError(username + "is already logged in");
+						printError(username + " is already logged in");
 						break;
 					}
 					else {
@@ -139,12 +169,30 @@ public class Server {
 						users.get(username).setLoginTime(new Date());
 						users.get(username).setLogoutTime(null);
 						users.get(username).setWriter(out);
-						break;
+						users.get(username).setActiveTime(new Date());
+						return true;
 					}
+					
 				}
+			} catch (IOException e) {
+		                System.out.println(e);
+			}
+			return false;
+		}
+		public void run() {
+			try {
+				in = new BufferedReader(new InputStreamReader(connSocket.getInputStream()));
+				out = new PrintWriter(connSocket.getOutputStream(), true);
+
+				loginHandler();
 				
+				checkActive();
+				
+				/* process cmd */
 				String line;
 				while ((line = in.readLine()) != null) {
+					users.get(username).setActiveTime(new Date());
+					checkActive();
 					String[] parts = line.split(" ", 2);
 					Command cmd = Enum.valueOf(Command.class, parts[0].toUpperCase());
 					switch (cmd) {
@@ -166,7 +214,7 @@ public class Server {
 							logoutTime = users.get(username).getLogoutTime();
 							if (logoutTime != null) {
 								long diff = currentTime.getTime() - logoutTime.getTime();
-								long oneHourInMillisec = LAST_HOUR * 60 * 1000;
+								long oneHourInMillisec = LAST_HOUR * 1000;
 								if (diff > oneHourInMillisec)
 									continue;
 							}
@@ -211,11 +259,12 @@ public class Server {
 						}
 						break;
 					case LOGOUT:
-						users.get(username).setLogoutTime(new Date());
-						users.get(username).setWriter(null);
+						logoutHandler();
+						
 						in.close();
 						out.close();
 						connSocket.close();
+						
 						break;
 					default:
 						printError("command not exist");
@@ -223,15 +272,12 @@ public class Server {
 
 					}
 				}
-
-
-	
-				
 			} catch (IOException e) {
 		                System.out.println(e);
-		        } 
+		    } 
 		}
 	}
+	
 
 	public static void main(String[] args) {
 		int port = Integer.parseInt(args[0]);
