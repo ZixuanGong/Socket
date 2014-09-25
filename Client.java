@@ -16,11 +16,16 @@ public class Client {
 		try {
 			connSocket = new Socket(serverAddr, port);
 			System.out.println("Connected!");
-			
+
 			out = new PrintWriter(connSocket.getOutputStream(), true);
 			in = new BufferedReader(new InputStreamReader(connSocket.getInputStream()));
 			messageThread = new MessageThread(in);
 			messageThread.start();
+			Runtime.getRuntime().addShutdownHook(new Thread() {
+			    public void run() { 
+			    	out.println("SHUT_DOWN");
+			    }
+			});
 			BufferedReader stdIn = new BufferedReader(new InputStreamReader(System.in));
 			while (true) {
 				String input;
@@ -33,9 +38,9 @@ public class Client {
 			}
 			closeConn();
 		} catch (UnknownHostException e) {
-			e.printStackTrace();
+			System.out.println(">>Cannot connect to " + serverAddr);
 		} catch (IOException e) {
-			e.printStackTrace();
+			System.out.println(">>Server is closed");
 		}
 	}
 
@@ -72,7 +77,7 @@ public class Client {
 				String msg;
 				while ((msg = in.readLine()) != null) {
 					if (msg.equals("TIME_OUT")) {
-						System.out.println("Time out, please login again");
+						System.out.println(">>Time out, please login again");
 						out.println("OK");
 						continue;
 					}	
