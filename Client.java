@@ -31,16 +31,12 @@ public class Client {
 				String input;
 				if ((input = stdIn.readLine()) != null) {
 					out.println(input);
-					if (input.equals("logout")) {
-						break;
-					}
 				}
 			}
-			closeConn();
 		} catch (UnknownHostException e) {
-			System.out.println(">>Cannot connect to " + serverAddr);
+			System.out.println("ERROR: Cannot connect to " + serverAddr);
 		} catch (IOException e) {
-			System.out.println(">>Server is closed");
+			System.out.println("ERROR: Server is closed");
 		}
 	}
 
@@ -77,10 +73,13 @@ public class Client {
 				String msg;
 				while ((msg = in.readLine()) != null) {
 					if (msg.equals("TIME_OUT")) {
-						System.out.println(">>Time out, please login again");
 						out.println("OK");
 						continue;
-					}	
+					} 
+					if (msg.equals("SHUT_DOWN")) {
+						closeConn();
+						System.exit(0);
+					}
 					System.out.println(msg);
 				}
 			} catch (IOException e) {

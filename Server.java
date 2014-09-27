@@ -7,6 +7,7 @@ import java.net.Socket;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Timer;
@@ -20,7 +21,17 @@ class User {
 	private Date logoutTime = null; 
 	private Date activeTime = null;
 	private Date blockTime = null;
+	private ArrayList<String> offlineMsg = null;
 	
+	public void addOfflineMsg(String msg) {
+		offlineMsg.add(msg);
+	}
+	public ArrayList<String> getOfflineMsg() {
+		return offlineMsg;
+	}
+	public void initOfflineMsg(ArrayList<String> offlineMsg) {
+		this.offlineMsg = offlineMsg;
+	}
 	public String getName() {
 		return name;
 	}
@@ -83,12 +94,24 @@ public class Server {
 				String[] parts = tmp[i].split(" ");
 				User user = new User();
 				user.setNamePass(parts[0], parts[1]);
+				user.initOfflineMsg(new ArrayList<String>());
 				users.put(parts[0], user);
 			}
 
 			ServerSocket serverSocket;
 			serverSocket = new ServerSocket(port);
 			System.out.println("Server is running");
+
+			Runtime.getRuntime().addShutdownHook(new Thread() {
+				    public void run() {
+				    	for (User user: users.values()) {
+				    		if (user.getWriter() != null) {
+					    		user.getWriter().println(">>Server is closed");
+						    	user.getWriter().println("SHUT_DOWN");
+				    		}
+				    	}
+				    }
+			});
 		
 			try {
 				while(true) {
@@ -125,19 +148,19 @@ public class Server {
 		}
 		
 		private void restartThread() {
-			ServerThread.this.stop();
 			new ServerThread(connSocket).start();
+			ServerThread.this.stop();
 		}
 
 		private void checkActive(){
 			Timer timer = new Timer();
-
 			timer.schedule(new TimerTask() {
 				
 				@Override
 				public void run() {
 					long diff = (new Date()).getTime() - users.get(username).getActiveTime().getTime();
 					if (diff > TIME_OUT * 1000) {
+						out.println(">>SERVER: Time out, please log in again");
 						out.println("TIME_OUT");
 						logoutHandler();
 						restartThread();
@@ -163,7 +186,6 @@ public class Server {
 		}
 
 		private boolean loginHandler() {
-//			HashMap<String, Integer> loginAttempts = new HashMap<>();
 			try {
 				while (true) {
 					out.println(">>Username");
@@ -210,11 +232,12 @@ public class Server {
 							else 
 								printError("wrong password, you have " + attempt + " more chances");
 						} else {
-							out.println(">>Welcome, " + username);
+							out.println(">>SERVER: Welcome, " + username);
 							users.get(username).setLoginTime(new Date());
 							users.get(username).setLogoutTime(null);
 							users.get(username).setWriter(out);
 							users.get(username).setActiveTime(new Date());
+							printOfflineMsg(users.get(username));
 							return true;
 						}
 					}
@@ -227,6 +250,12 @@ public class Server {
 			}
 			return false;
 		}
+		
+		private void printOfflineMsg(User user) {
+			for (String msg: user.getOfflineMsg())
+				user.getWriter().println(">>" + msg);
+		}
+
 		public void run() {
 			try {
 				in = new BufferedReader(new InputStreamReader(connSocket.getInputStream()));
@@ -253,27 +282,30 @@ public class Server {
 								if (user.getName().equals(username))
 									continue;
 								if (user.getWriter() != null)
-									out.println(user.getName());
+									out.println(">>" + user.getName());
 							}
 						} else if (cmd.equals("wholasthr")) {
 							Date currentTime = new Date();
 							Date logoutTime;
+							long diff;
+							long oneHourInMillisec = LAST_HOUR * 1000;
 							for (User user: users.values()) {
 								if (user.getName().equals(username))
 									continue;
 								
-								logoutTime = users.get(username).getLogoutTime();
-								if (logoutTime != null) {
-									long diff = currentTime.getTime() - logoutTime.getTime();
-									long oneHourInMillisec = LAST_HOUR * 1000;
+								logoutTime = user.getLogoutTime();
+								// check offline users' logout time
+								if (logoutTime != null) { //online users' logout time is null
+									diff = currentTime.getTime() - logoutTime.getTime();
 									if (diff > oneHourInMillisec)
 										continue;
 								}
 								
+								// check those who never gets online
 								if (logoutTime == null && user.getLoginTime() == null)
 									continue;
 
-								out.println(user.getName());
+								out.println(">>" + user.getName());
 							}
 						} else if (cmd.equals("message")) {
 							/* input contains only "message" */
@@ -289,27 +321,37 @@ public class Server {
 							}
 
 							String receiver = tmp[0];
+							String msg = username + ": " + tmp[1];
 							if (!users.containsKey(receiver))
 								printError("user \"" + receiver + "\" does not exist");
-							else {
-								String msg = username + ": " + tmp[1];
+
+							else if (receiver.equals(username))
+								printError("you cannot send message to yourself");
+
+							else if (users.get(receiver).getWriter() == null) { //receiver offline
+								users.get(receiver).addOfflineMsg(msg);
+								out.println(">>SERVER: " + receiver + " is offline");
+							} else
 								users.get(receiver).getWriter().println(">>" + msg);
-							}
+						
 						} else if (cmd.equals("broadcast")) {
 							if (parts.length < 2) {
 								printError("invalid command");
 								break;
 							}
-							for (User user: users.values()) {
-								if (user.getName().equals(username))
+							String msg = "[Broadcast] " + username + ": " + parts[1];
+							for (User receiver: users.values()) {
+								if (receiver.getName().equals(username))
 									continue;
-								if (user.getWriter() == null)
+								if (receiver.getWriter() == null) {
+									users.get(receiver.getName()).addOfflineMsg(msg);
 									continue;
-								String msg = username + ": " + parts[1];
-								user.getWriter().println(">>" + msg);
+								}
+								receiver.getWriter().println(">>" + msg);
 							}
 						} else if (cmd.equals("logout")) {
 							logoutHandler();
+							restartThread();
 						} else {
 							printError("command not exist");
 						} // end switch
