@@ -21,6 +21,7 @@ class User {
 	private Date logoutTime = null; 
 	private Date activeTime = null;
 	private Date blockTime = null;
+	private String blockIP = null;
 	private ArrayList<String> offlineMsg = null;
 	
 	public void addOfflineMsg(String msg) {
@@ -72,11 +73,17 @@ class User {
 	public void setBlockTime(Date blockTime) {
 		this.blockTime = blockTime;
 	}
+	public String getBlockIP() {
+		return blockIP;
+	}
+	public void setBlockIP(String blockIP) {
+		this.blockIP = blockIP;
+	}
 }
 
 public class Server {
-	private static final int LAST_HOUR = 60 * 60; /* seconds */
-	private static final int TIME_OUT = 30 * 60; /* seconds */
+	private static final int LAST_HOUR = 10; /* seconds */
+	private static final int TIME_OUT = 10; /* seconds */
 	private static final int BLOCK_TIME = 60; /* seconds */
 	private HashMap<String,User> users = new HashMap<>();
 	
@@ -128,13 +135,15 @@ public class Server {
 
 	private class ServerThread extends Thread {
 		private Socket connSocket;
+		private String IpAddr;
 		private BufferedReader in;
 		private PrintWriter out;
 		private String username;
-		private int attempt = 3;
+		private int attempt;
 
 		public ServerThread(Socket socket) {
 			this.connSocket = socket;
+			this.IpAddr = connSocket.getRemoteSocketAddress().toString();
 		}
 		
 		private void logoutHandler() {
@@ -144,7 +153,7 @@ public class Server {
 		}
 
 		private void printError(String msg) {
-			out.println(">>Error: " + msg);
+			out.println(">>ERROR: " + msg);
 		}
 		
 		private void restartThread() {
@@ -185,7 +194,7 @@ public class Server {
 	            	}
 		}
 
-		private boolean loginHandler() {
+		private void loginHandler() {
 			try {
 				while (true) {
 					out.println(">>Username");
@@ -195,15 +204,18 @@ public class Server {
 					else
 						username = tmp;
 
-					/* check block time */
+					/* check if the user is blocked form this IP */
 					Date blockTime = users.get(username).getBlockTime();
-					if (blockTime != null) {
+					String blockIp = users.get(username).getBlockIP();
+					/* current IP has been blocked before */
+					if (blockTime != null && blockIp != null && blockIp.equals(IpAddr)) {
 						long diff = new Date().getTime() - blockTime.getTime();
 						if (diff < BLOCK_TIME * 1000) {
-							printError(username + " is blocked, please try " + (BLOCK_TIME - diff/1000) + " seconds later");
+							printError(username + " is blocked from this IP, please try " + (BLOCK_TIME - diff/1000) + " seconds later");
 							continue;
 						} else {
 							users.get(username).setBlockTime(null);
+							users.get(username).setBlockIP(null);
 						}
 					}
 
@@ -211,12 +223,13 @@ public class Server {
 						printError("no such user");
 					} else if (users.get(username).getWriter() != null) {
 						printError(username + " is already logged in");
-						break;
+						continue;
 					} else {
 						out.println(">>Password:");
 					}
 					
 					/* detect 3 consecutive wrong psw */
+					attempt = 3;
 					while (attempt > 0) {
 						tmp = in.readLine();
 						if (tmp.equals("SHUT_DOWN")) {
@@ -227,10 +240,16 @@ public class Server {
 						if (!tmp.equals(users.get(username).getPassword())) {
 							attempt--;
 
-							if (attempt < 1)
-								printError("3 consecutive errors, you are blocked for "+BLOCK_TIME+" seconds");
-							else 
-								printError("wrong password, you have " + attempt + " more chances");
+							if (attempt < 1) {
+								printError("3 consecutive errors, this IP will be blocked for "+BLOCK_TIME+" seconds");
+								users.get(username).setBlockTime(new Date());
+								users.get(username).setBlockIP(IpAddr);
+								System.out.println(username + " is blocked from " + IpAddr + " for " + BLOCK_TIME + " seconds");
+							}
+							else if (attempt == 1)
+								printError("wrong password, you have 1 more chance");
+							else
+								printError("wrong password, you have " + attempt + " more chances");	
 						} else {
 							out.println(">>SERVER: Welcome, " + username);
 							users.get(username).setLoginTime(new Date());
@@ -238,17 +257,13 @@ public class Server {
 							users.get(username).setWriter(out);
 							users.get(username).setActiveTime(new Date());
 							printOfflineMsg(users.get(username));
-							return true;
+							return;
 						}
 					}
-					/* block the user */
-					users.get(username).setBlockTime(new Date());
-					System.out.println(username + " is blocked for " + BLOCK_TIME + " seconds");
 				}
 			} catch (IOException e) {
 				System.out.println("Error in loginHandler");
 			}
-			return false;
 		}
 		
 		private void printOfflineMsg(User user) {
