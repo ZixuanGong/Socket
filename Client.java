@@ -23,7 +23,7 @@ public class Client {
 			messageThread.start();
 			Runtime.getRuntime().addShutdownHook(new Thread() {
 			    public void run() { 
-			    	closeConn();
+			    	out.println("SHUT_DOWN");
 			    }
 			});
 			BufferedReader stdIn = new BufferedReader(new InputStreamReader(System.in));
@@ -73,7 +73,7 @@ public class Client {
 				String msg;
 				while ((msg = in.readLine()) != null) {
 					if (msg.equals("TIME_OUT")) {
-						out.println("");
+						out.println("OK");
 						continue;
 					} 
 					if (msg.equals("SHUT_DOWN")) {
