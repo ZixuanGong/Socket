@@ -82,8 +82,8 @@ class User {
 }
 
 public class Server {
-	private static final int LAST_HOUR = 60 * 60; /* seconds */
-	private static final int TIME_OUT = 10; /* seconds */
+	private static final int LAST_HOUR = 10; /* seconds */
+	private static final int TIME_OUT = 30 * 60; /* seconds */
 	private static final int BLOCK_TIME = 60; /* seconds */
 	private HashMap<String,User> users = new HashMap<>();
 	
@@ -171,8 +171,6 @@ public class Server {
 					if (diff > TIME_OUT * 1000) {
 						out.println(">>SERVER: Time out, please log in again");
 						out.println("TIME_OUT");
-						logoutHandler();
-						restartThread();
 					}	
 				}
 			},  TIME_OUT * 1000);
@@ -198,11 +196,7 @@ public class Server {
 			try {
 				while (true) {
 					out.println(">>Username");
-					String tmp = in.readLine();
-					if (tmp.equals("SHUT_DOWN"))
-						shutDown();
-					else
-						username = tmp;
+					username = in.readLine();
 
 					/* check if the user is blocked form this IP */
 					Date blockTime = users.get(username).getBlockTime();
@@ -231,12 +225,7 @@ public class Server {
 					/* detect 3 consecutive wrong psw */
 					attempt = 3;
 					while (attempt > 0) {
-						tmp = in.readLine();
-						if (tmp.equals("SHUT_DOWN")) {
-							logoutHandler();
-							shutDown();
-						}
-
+						String tmp = in.readLine();
 						if (!tmp.equals(users.get(username).getPassword())) {
 							attempt--;
 
@@ -264,6 +253,8 @@ public class Server {
 				}
 			} catch (IOException e) {
 				System.out.println("Error in loginHandler");
+			} catch (NullPointerException e) {
+				shutDown();
 			}
 		}
 		
@@ -282,12 +273,13 @@ public class Server {
 				String line;
 				while (true) {
 					line = in.readLine();
-					if (line.equals("SHUT_DOWN")) {
-						logoutHandler();
-						shutDown();
-					} 
-
 					if (line != null){
+						if (line.equals("logout")){
+							logoutHandler();
+							restartThread();
+							break;
+						}
+
 						users.get(username).setActiveTime(new Date());
 						checkActive();
 						String[] parts = line.split(" ", 2);
@@ -365,18 +357,16 @@ public class Server {
 								}
 								receiver.getWriter().println(">>" + msg);
 							}
-						} else if (cmd.equals("logout")) {
-							logoutHandler();
-							restartThread();
 						} else {
 							printError("command not exist");
 						} // end switch
 					} // end if(line != null)
 				}// end while
 			} catch (IOException e) {
-				System.out.println("Connection with " + connSocket.getInetAddress() + " is closed");
+				e.printStackTrace();
+		    } catch (NullPointerException e) {
 				shutDown();
-		    	}
+		    }
 		}
 	}
 	
