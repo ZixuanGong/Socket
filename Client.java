@@ -36,7 +36,7 @@ public class Client {
 		} catch (UnknownHostException e) {
 			System.out.println("ERROR: Cannot connect to " + serverAddr);
 		} catch (IOException e) {
-			System.out.println("ERROR: Server is closed");
+			System.out.println("ERROR: Cannot connect to " + serverAddr + " at port " + port);
 		}
 	}
 

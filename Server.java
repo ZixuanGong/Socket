@@ -195,7 +195,7 @@ public class Server {
 		private void loginHandler() {
 			try {
 				while (true) {
-					out.println(">>Username");
+					out.print(">>Username:");
 					username = in.readLine();
 
 					/* check if the user is blocked form this IP */
