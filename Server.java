@@ -13,76 +13,8 @@ import java.util.HashMap;
 import java.util.Timer;
 import java.util.TimerTask;
 
-class User {
-	private String name;
-	private String password;
-	private PrintWriter writer = null;
-	private Date loginTime = null;
-	private Date logoutTime = null; 
-	private Date activeTime = null;
-	private Date blockTime = null;
-	private String blockIP = null;
-	private ArrayList<String> offlineMsg = null;
-	
-	public void addOfflineMsg(String msg) {
-		offlineMsg.add(msg);
-	}
-	public ArrayList<String> getOfflineMsg() {
-		return offlineMsg;
-	}
-	public void initOfflineMsg(ArrayList<String> offlineMsg) {
-		this.offlineMsg = offlineMsg;
-	}
-	public String getName() {
-		return name;
-	}
-	public void setNamePass(String name, String password) {
-		this.name = name;
-		this.password = password;
-	}
-	public String getPassword() {
-		return password;
-	}
-	public PrintWriter getWriter() {
-		return writer;
-	}
-	public void setWriter(PrintWriter writer) {
-		this.writer = writer;
-	}
-	public Date getLoginTime() {
-		return loginTime;
-	}
-	public void setLoginTime(Date loginTime) {
-		this.loginTime = loginTime;
-	}
-	public Date getLogoutTime() {
-		return logoutTime;
-	}
-	public void setLogoutTime(Date logoutTime) {
-		this.logoutTime = logoutTime;
-	}
-	public Date getActiveTime() {
-		return activeTime;
-	}
-	public void setActiveTime(Date activeTime) {
-		this.activeTime = activeTime;
-	}
-	public Date getBlockTime() {
-		return blockTime;
-	}
-	public void setBlockTime(Date blockTime) {
-		this.blockTime = blockTime;
-	}
-	public String getBlockIP() {
-		return blockIP;
-	}
-	public void setBlockIP(String blockIP) {
-		this.blockIP = blockIP;
-	}
-}
-
 public class Server {
-	private static final int LAST_HOUR = 10; /* seconds */
+	private static final int LAST_HOUR = 30 * 60; /* seconds */
 	private static final int TIME_OUT = 30 * 60; /* seconds */
 	private static final int BLOCK_TIME = 60; /* seconds */
 	private HashMap<String,User> users = new HashMap<>();
@@ -121,9 +53,8 @@ public class Server {
 			});
 		
 			try {
-				while(true) {
+				while(true) 
 					new ServerThread(serverSocket.accept()).start();
-				}
 			} finally {
 				serverSocket.close();
 			}
@@ -302,14 +233,14 @@ public class Server {
 									continue;
 								
 								logoutTime = user.getLogoutTime();
-								// check offline users' logout time
-								if (logoutTime != null) { //online users' logout time is null
+								/* check offline users' logout time */
+								if (logoutTime != null) { /*online users' logout time is null */
 									diff = currentTime.getTime() - logoutTime.getTime();
 									if (diff > oneHourInMillisec)
 										continue;
 								}
 								
-								// check those who never gets online
+								/* check those who never gets online */
 								if (logoutTime == null && user.getLoginTime() == null)
 									continue;
 
@@ -336,7 +267,7 @@ public class Server {
 							else if (receiver.equals(username))
 								printError("you cannot send message to yourself");
 
-							else if (users.get(receiver).getWriter() == null) { //receiver offline
+							else if (users.get(receiver).getWriter() == null) { /* receiver offline */
 								users.get(receiver).addOfflineMsg(msg);
 								out.println(">>SERVER: " + receiver + " is offline");
 							} else
@@ -359,9 +290,9 @@ public class Server {
 							}
 						} else {
 							printError("command not exist");
-						} // end switch
-					} // end if(line != null)
-				}// end while
+						} /* end switch */
+					} /* end if(line != null) */
+				}/* end while */
 			} catch (IOException e) {
 				e.printStackTrace();
 		    } catch (NullPointerException e) {
@@ -376,4 +307,72 @@ public class Server {
 		Server server = new Server(port);
 	}
 
+}
+
+class User {
+	private String name;
+	private String password;
+	private PrintWriter writer = null;
+	private Date loginTime = null;
+	private Date logoutTime = null; 
+	private Date activeTime = null;
+	private Date blockTime = null;
+	private String blockIP = null;
+	private ArrayList<String> offlineMsg = null;
+	
+	public void addOfflineMsg(String msg) {
+		offlineMsg.add(msg);
+	}
+	public ArrayList<String> getOfflineMsg() {
+		return offlineMsg;
+	}
+	public void initOfflineMsg(ArrayList<String> offlineMsg) {
+		this.offlineMsg = offlineMsg;
+	}
+	public String getName() {
+		return name;
+	}
+	public void setNamePass(String name, String password) {
+		this.name = name;
+		this.password = password;
+	}
+	public String getPassword() {
+		return password;
+	}
+	public PrintWriter getWriter() {
+		return writer;
+	}
+	public void setWriter(PrintWriter writer) {
+		this.writer = writer;
+	}
+	public Date getLoginTime() {
+		return loginTime;
+	}
+	public void setLoginTime(Date loginTime) {
+		this.loginTime = loginTime;
+	}
+	public Date getLogoutTime() {
+		return logoutTime;
+	}
+	public void setLogoutTime(Date logoutTime) {
+		this.logoutTime = logoutTime;
+	}
+	public Date getActiveTime() {
+		return activeTime;
+	}
+	public void setActiveTime(Date activeTime) {
+		this.activeTime = activeTime;
+	}
+	public Date getBlockTime() {
+		return blockTime;
+	}
+	public void setBlockTime(Date blockTime) {
+		this.blockTime = blockTime;
+	}
+	public String getBlockIP() {
+		return blockIP;
+	}
+	public void setBlockIP(String blockIP) {
+		this.blockIP = blockIP;
+	}
 }
