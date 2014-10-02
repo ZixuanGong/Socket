@@ -1,12 +1,11 @@
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.nio.file.FileSystems;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -14,27 +13,28 @@ import java.util.Timer;
 import java.util.TimerTask;
 
 public class Server {
-	private static final int LAST_HOUR = 30 * 60; /* seconds */
+	private static final int LAST_HOUR = 60 * 60; /* seconds */
 	private static final int TIME_OUT = 30 * 60; /* seconds */
 	private static final int BLOCK_TIME = 60; /* seconds */
-	private HashMap<String,User> users = new HashMap<>();
+	private HashMap<String,User> users = new HashMap<String,User>();
 	
 	public Server(int port){
 
 		/* Read from user_pass.txt */
-		String file_path = System.getProperty("user.dir");
-		Path file = FileSystems.getDefault().getPath(file_path, "user_pass.txt");
+		String project_path = System.getProperty("user.dir");
+		File file = new File(project_path + "/user_pass.txt");	
 		try {
-			byte[] bytes = Files.readAllBytes(file);
-			String line = new String(bytes, "UTF-8");
-
-			String[] tmp = line.split("\n");
-			for (int i = 0; i < tmp.length; i++) {
-				String[] parts = tmp[i].split(" ");
-				User user = new User();
-				user.setNamePass(parts[0], parts[1]);
-				user.initOfflineMsg(new ArrayList<String>());
-				users.put(parts[0], user);
+			BufferedReader input = new BufferedReader(new FileReader(file));
+			String line = null;
+			while ((line = input.readLine()) != null) {
+				String[] tmp = line.split("\n");
+				for (int i = 0; i < tmp.length; i++) {
+					String[] parts = tmp[i].split(" ");
+					User user = new User();
+					user.setNamePass(parts[0], parts[1]);
+					user.initOfflineMsg(new ArrayList<String>());
+					users.put(parts[0], user);
+				}
 			}
 
 			ServerSocket serverSocket;
@@ -53,8 +53,9 @@ public class Server {
 			});
 		
 			try {
-				while(true) 
+				while(true) {
 					new ServerThread(serverSocket.accept()).start();
+				}
 			} finally {
 				serverSocket.close();
 			}
@@ -233,14 +234,14 @@ public class Server {
 									continue;
 								
 								logoutTime = user.getLogoutTime();
-								/* check offline users' logout time */
-								if (logoutTime != null) { /*online users' logout time is null */
+								// check offline users' logout time
+								if (logoutTime != null) { //online users' logout time is null
 									diff = currentTime.getTime() - logoutTime.getTime();
 									if (diff > oneHourInMillisec)
 										continue;
 								}
 								
-								/* check those who never gets online */
+								// check those who never gets online
 								if (logoutTime == null && user.getLoginTime() == null)
 									continue;
 
@@ -267,7 +268,7 @@ public class Server {
 							else if (receiver.equals(username))
 								printError("you cannot send message to yourself");
 
-							else if (users.get(receiver).getWriter() == null) { /* receiver offline */
+							else if (users.get(receiver).getWriter() == null) { //receiver offline
 								users.get(receiver).addOfflineMsg(msg);
 								out.println(">>SERVER: " + receiver + " is offline");
 							} else
@@ -290,9 +291,9 @@ public class Server {
 							}
 						} else {
 							printError("command not exist");
-						} /* end switch */
-					} /* end if(line != null) */
-				}/* end while */
+						} // end switch
+					} // end if(line != null)
+				}// end while
 			} catch (IOException e) {
 				e.printStackTrace();
 		    } catch (NullPointerException e) {
@@ -376,3 +377,4 @@ class User {
 		this.blockIP = blockIP;
 	}
 }
+
